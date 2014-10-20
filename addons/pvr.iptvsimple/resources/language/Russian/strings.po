@@ -1,16 +1,15 @@
 # XBMC Media Center language file
-# Addon Name: PVR IP-TV Simple Client
+# Addon Name: PVR IPTV Simple Client
 # Addon id: pvr.iptvsimple
-# Addon version: 0.1.0
 # Addon Provider: nightik
 msgid ""
 msgstr ""
-"Project-Id-Version: XBMC Main Translation Project (Frodo)\n"
+"Project-Id-Version: XBMC Main\n"
 "Report-Msgid-Bugs-To: http://trac.xbmc.org/\n"
 "POT-Creation-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: XBMC Translation Team\n"
-"Language-Team: Russian (http://www.transifex.com/projects/p/XBMC-Main-Frodo/language/ru/)\n"
+"Language-Team: Russian (http://www.transifex.com/projects/p/xbmc-main/language/ru/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -67,11 +66,11 @@ msgstr "Сдвиг по времени для EPG (часов)"
 
 msgctxt "#30025"
 msgid "Cache m3u at local storage"
-msgstr "Кешировать m3u на локальном носителе"
+msgstr "Кэшировать m3u в локальное хранилище"
 
 msgctxt "#30026"
 msgid "Cache XMLTV at local storage"
-msgstr "Кешировать XMLTV на локальном носителе"
+msgstr "Кэшировать XMLTV в локальное хранилище"
 
 msgctxt "#30030"
 msgid "Channels Logos"
@@ -83,4 +82,4 @@ msgstr "Папка с логотипами каналов"
 
 msgctxt "#30032"
 msgid "Channels Logos Base URL"
-msgstr "Базовый URL для логотипов"
+msgstr "Основной URL для логитипов каналов"

@@ -17,7 +17,8 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with XBMC; see the file COPYING.  If not, write to
- *  the Free Software Foundation, 675 Mass Ave, Cambridge, MA 02139, USA.
+ *  the Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
+ *  MA 02110-1301  USA
  *  http://www.gnu.org/copyleft/gpl.html
  *
  */
@@ -161,13 +162,13 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
     if (buffer[0] != '\xEF' || buffer[1] != '\xBB' || buffer[2] != '\xBF')
     {
       // check for tar archive
-      if (strcmp(buffer + 0x101, "ustar") ||
-          strcmp(buffer + 0x101, "GNUtar"))
+      if (strcmp(buffer + 0x101, "ustar") || strcmp(buffer + 0x101, "GNUtar"))
       {
         buffer += 0x200; // RECORDSIZE = 512
       }
       else
       {
+        XBMC->Log(LOG_ERROR, "Invalid EPG file '%s': unable to parse file.", m_strXMLTVUrl.c_str());
         m_bEGPLoaded = true;
         return false;
       }
@@ -210,18 +211,9 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
     {
       continue;
     }
+    GetNodeValue(pChannelNode, "display-name", strName);
 
-    PVRIptvChannel *channel = NULL;
-    for (xml_node<> *pNameNode = pChannelNode->first_node("display-name"); pNameNode; pNameNode = pNameNode->next_sibling("display-name"))
-    {
-      strName = pNameNode->value();
-      channel = FindChannel(strId, strName);
-      if (channel)
-      {
-        break;
-      }
-    }
-    if (!channel)
+    if (FindChannel(strId, strName) == NULL)
     {
       continue;
     }
@@ -625,7 +617,9 @@ PVR_ERROR PVRIptvData::GetEPGForChannel(ADDON_HANDLE handle, const PVR_CHANNEL &
   for (myChannel = m_channels.begin(); myChannel < m_channels.end(); myChannel++)
   {
     if (myChannel->iUniqueId != (int) channel.iUniqueId)
+    {
       continue;
+    }
 
     if (!m_bEGPLoaded || iStart > m_iLastStart || iEnd > m_iLastEnd) 
     {
