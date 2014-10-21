@@ -51,15 +51,6 @@ std::string g_strClientPath = "";
 CHelper_libXBMC_addon *XBMC = NULL;
 CHelper_libXBMC_pvr   *PVR  = NULL;
 
-std::string g_strTvgPath    = "";
-std::string g_strM3UPath    = "";
-std::string g_strLogoPath   = "";
-int         g_iEPGTimeShift = 0;
-int         g_iStartNumber  = 1;
-bool        g_bTSOverride   = true;
-bool        g_bCacheM3U     = false;
-bool        g_bCacheEPG     = false;
-
 extern std::string PathCombine(const std::string &strPath, const std::string &strFileName)
 {
   std::string strResult = strPath;
@@ -91,83 +82,6 @@ extern "C" {
 
 void ADDON_ReadSettings(void)
 {
-  char buffer[1024];
-  int iPathType = 0;
-  if (!XBMC->GetSetting("m3uPathType", &iPathType)) 
-  {
-    iPathType = 1;
-  }
-  if (iPathType)
-  {
-    if (XBMC->GetSetting("m3uUrl", &buffer)) 
-    {
-      g_strM3UPath = buffer;
-    }
-    if (!XBMC->GetSetting("m3uCache", &g_bCacheM3U))
-    {
-      g_bCacheM3U = true;
-    }
-  }
-  else
-  {
-    if (XBMC->GetSetting("m3uPath", &buffer)) 
-    {
-      g_strM3UPath = buffer;
-    }
-    g_bCacheM3U = false;
-  }
-  if (g_strM3UPath == "") 
-  {
-    g_strM3UPath = GetClientFilePath(M3U_FILE_NAME);
-  }
-  if (!XBMC->GetSetting("startNum", &g_iStartNumber)) 
-  {
-    g_iStartNumber = 1;
-  }
-  if (!XBMC->GetSetting("epgPathType", &iPathType)) 
-  {
-    iPathType = 1;
-  }
-  if (iPathType)
-  {
-    if (XBMC->GetSetting("epgUrl", &buffer)) 
-    {
-      g_strTvgPath = buffer;
-    }
-    if (!XBMC->GetSetting("epgCache", &g_bCacheEPG))
-    {
-      g_bCacheEPG = true;
-    }
-  }
-  else
-  {
-    if (XBMC->GetSetting("epgPath", &buffer)) 
-    {
-      g_strTvgPath = buffer;
-    }
-    g_bCacheEPG = false;
-  }
-  float fShift;
-  if (XBMC->GetSetting("epgTimeShift", &fShift))
-  {
-    g_iEPGTimeShift = (int)(fShift * 3600.0); // hours to seconds
-  }
-  if (!XBMC->GetSetting("epgTSOverride", &g_bTSOverride))
-  {
-    g_bTSOverride = true;
-  }
-  if (!XBMC->GetSetting("logoPathType", &iPathType)) 
-  {
-    iPathType = 1;
-  }
-  if (XBMC->GetSetting(iPathType ? "logoBaseUrl" : "logoPath", &buffer)) 
-  {
-    g_strLogoPath = buffer;
-  }
-  if (g_strLogoPath == "")
-  {
-    g_strLogoPath = GetClientFilePath("icons/");
-  }
 }
 
 ADDON_STATUS ADDON_Create(void* hdl, void* props)
@@ -242,26 +156,45 @@ unsigned int ADDON_GetSettings(ADDON_StructSetting ***sSet)
 
 ADDON_STATUS ADDON_SetSetting(const char *settingName, const void *settingValue)
 {
-  // reset cache and restart addon 
+  // reset cache and restart addon
+  char nameBuffer[128];
 
-  string strFile = GetUserFilePath(M3U_FILE_NAME);
-  if (XBMC->FileExists(strFile.c_str(), false))
+  for (int i = 0;; i++)
   {
+    sprintf(nameBuffer, M3U_FILE_NAME_FORMAT, i);
+    string strFile = GetUserFilePath(nameBuffer);
+
+    if (XBMC->FileExists(strFile.c_str(), false))
+    {
 #ifdef TARGET_WINDOWS
-    DeleteFile(strFile.c_str());
+      DeleteFile(strFile.c_str());
 #else
-    XBMC->DeleteFile(strFile.c_str());
+      XBMC->DeleteFile(strFile.c_str());
 #endif
+    }
+    else
+    {
+      break;
+    }
   }
 
-  strFile = GetUserFilePath(TVG_FILE_NAME);
-  if (XBMC->FileExists(strFile.c_str(), false))
+  for (int i = 0;; i++)
   {
+    sprintf(nameBuffer, TVG_FILE_NAME_FORMAT, i);
+    string strFile = GetUserFilePath(nameBuffer);
+
+    if (XBMC->FileExists(strFile.c_str(), false))
+    {
 #ifdef TARGET_WINDOWS
-    DeleteFile(strFile.c_str());
+      DeleteFile(strFile.c_str());
 #else
-    XBMC->DeleteFile(strFile.c_str());
+      XBMC->DeleteFile(strFile.c_str());
 #endif
+    }
+    else
+    {
+      break;
+    }
   }
 
   return ADDON_STATUS_NEED_RESTART;
@@ -437,9 +370,12 @@ PVR_ERROR SignalStatus(PVR_SIGNAL_STATUS &signalStatus)
   return PVR_ERROR_NO_ERROR;
 }
 
+bool CanPauseStream(void) {
+  return true;
+}
+
 /** UNUSED API FUNCTIONS */
 const char * GetLiveStreamURL(const PVR_CHANNEL &channel)  { return ""; }
-bool CanPauseStream(void) { return false; }
 int GetRecordingsAmount(void) { return -1; }
 PVR_ERROR GetRecordings(ADDON_HANDLE handle) { return PVR_ERROR_NOT_IMPLEMENTED; }
 PVR_ERROR DialogChannelScan(void) { return PVR_ERROR_NOT_IMPLEMENTED; }

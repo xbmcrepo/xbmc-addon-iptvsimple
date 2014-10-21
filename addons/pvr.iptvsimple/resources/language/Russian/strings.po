@@ -83,3 +83,31 @@ msgstr "Папка с логотипами каналов"
 msgctxt "#30032"
 msgid "Channels Logos Base URL"
 msgstr "Основной URL для логитипов каналов"
+
+msgctxt "#30040"
+msgid "Sources"
+msgstr "Источники"
+
+msgctxt "#30041"
+msgid "Number of sources"
+msgstr "Количество источников"
+
+msgctxt "#30042"
+msgid "Source"
+msgstr "Источник"
+
+msgctxt "#30043"
+msgid "Channels list"
+msgstr "Список каналов"
+
+msgctxt "#30044"
+msgid "Group name format"
+msgstr "Формат имени группы"
+
+msgctxt "#30045"
+msgid "Channel name format"
+msgstr "Формат имени канала"
+
+msgctxt "#30046"
+msgid "Logo file name format"
+msgstr "Формат имени файла логотипа"

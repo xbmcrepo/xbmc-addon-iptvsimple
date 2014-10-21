@@ -91,3 +91,31 @@ msgstr ""
 msgctxt "#30032"
 msgid "Channels Logos Base URL"
 msgstr ""
+
+msgctxt "#30040"
+msgid "Sources"
+msgstr ""
+
+msgctxt "#30041"
+msgid "Number of sources"
+msgstr ""
+
+msgctxt "#30042"
+msgid "Source"
+msgstr ""
+
+msgctxt "#30043"
+msgid "Channels list"
+msgstr ""
+
+msgctxt "#30044"
+msgid "Group name format"
+msgstr ""
+
+msgctxt "#30045"
+msgid "Channel name format"
+msgstr ""
+
+msgctxt "#30046"
+msgid "Logo file name format"
+msgstr ""

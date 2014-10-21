@@ -70,17 +70,13 @@ inline bool GetAttributeValue(const xml_node<Ch> * pNode, const char* strAttribu
   return true;
 }
 
-PVRIptvData::PVRIptvData(void)
+PVRIptvData::PVRIptvData()
 {
-  m_strXMLTVUrl   = g_strTvgPath;
-  m_strM3uUrl     = g_strM3UPath;
-  m_strLogoPath   = g_strLogoPath;
-  m_iEPGTimeShift = g_iEPGTimeShift;
-  m_bTSOverride   = g_bTSOverride;
   m_iLastStart    = 0;
   m_iLastEnd      = 0;
-
+  m_iStartNumber  = 1;
   m_bEGPLoaded = false;
+  LoadSettings();
 
   if (LoadPlayList())
   {
@@ -95,32 +91,220 @@ void *PVRIptvData::Process(void)
 
 PVRIptvData::~PVRIptvData(void)
 {
+  m_sources.clear();
   m_channels.clear();
   m_groups.clear();
   m_epg.clear();
 }
 
-bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd) 
-{
-  if (m_strXMLTVUrl.IsEmpty())
+void PVRIptvData::LoadSettings() {
+  const char   *fmt = "%s_%i";
+  float         fShift;
+  char          nameBuffer[128];
+  char          valueBuffer[1024];
+  int           iPathType = 0;
+  int           iSourceCount = 1;
+
+  // Get number of configured sources
+  if (!XBMC->GetSetting("sourceCount", &iSourceCount))
   {
-    XBMC->Log(LOG_NOTICE, "EPG file path is not configured. EPG not loaded.");
-    m_bEGPLoaded = true;
+    XBMC->Log(LOG_NOTICE, "No sources configured");
+  }
+  if (iSourceCount <= 0)
+  {
+    iSourceCount = 1;
+  }
+  else
+  {
+    iSourceCount ++;
+  }
+
+  // Get start number
+  if (!XBMC->GetSetting("startNum", &m_iStartNumber))
+  {
+    m_iStartNumber = 1;
+  }
+
+  for (int i = 0; i <= iSourceCount; i++)
+  {
+    PVRIptvSource source;
+    source.iId = i;
+
+    // Get M3U settings
+    if (i != 0) // Source 0 has only default settings for EPG and logos.
+    {
+      sprintf(nameBuffer, fmt, "m3uPathType", i);
+      if (!XBMC->GetSetting(nameBuffer, &iPathType))
+      {
+        iPathType = 1;
+      }
+      if (iPathType)
+      {
+        sprintf(nameBuffer, fmt, "m3uUrl", i);
+        if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+        {
+          source.strM3UPath = valueBuffer;
+        }
+        sprintf(nameBuffer, fmt, "m3uCache", i);
+        if (!XBMC->GetSetting(nameBuffer, &(source.bCacheM3U)))
+        {
+          source.bCacheM3U = true;
+        }
+      }
+      else
+      {
+        sprintf(nameBuffer, fmt, "m3uPath", i);
+        if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+        {
+          source.strM3UPath = valueBuffer;
+        }
+        source.bCacheM3U = false;
+      }
+    }
+
+    // Get name formats
+    sprintf(nameBuffer, fmt, "groupNameFormat", i);
+    if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+    {
+      source.strGroupNameFormat = valueBuffer;
+    }
+    else
+    {
+      source.strGroupNameFormat = "%s";
+    }
+    sprintf(nameBuffer, fmt, "channelNameFormat", i);
+    if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+    {
+      source.strChannelNameFormat = valueBuffer;
+    }
+    else
+    {
+      source.strChannelNameFormat = "%s";
+    }
+    sprintf(nameBuffer, fmt, "logoFileNameFormat", i);
+    if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+    {
+      source.strLogoFileNameFormat = valueBuffer;
+    }
+    else
+    {
+      source.strLogoFileNameFormat = "%s";
+    }
+
+    // Get EPG settings
+    sprintf(nameBuffer, fmt, "epgPathType", i);
+    if (!XBMC->GetSetting(nameBuffer, &iPathType))
+    {
+      iPathType = 1;
+    }
+    if (iPathType)
+    {
+      sprintf(nameBuffer, fmt, "epgUrl", i);
+      if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+      {
+        source.strTvgPath = valueBuffer;
+      }
+      sprintf(nameBuffer, fmt, "epgCache", i);
+      if (!XBMC->GetSetting(nameBuffer, &(source.bCacheEPG)))
+      {
+        source.bCacheEPG = true;
+      }
+    }
+    else
+    {
+      sprintf(nameBuffer, fmt, "epgPath", i);
+      if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+      {
+        source.strTvgPath = valueBuffer;
+      }
+      source.bCacheEPG = false;
+    }
+    sprintf(nameBuffer, fmt, "epgTimeShift", i);
+    if (XBMC->GetSetting(nameBuffer, &fShift))
+    {
+      source.iEPGTimeShift = (int)(fShift * 3600.0); // hours to seconds
+    }
+    else
+    {
+      source.iEPGTimeShift = 0;
+    }
+    sprintf(nameBuffer, fmt, "epgTSOverride", i);
+    if (!XBMC->GetSetting(nameBuffer, &(source.bTSOverride)))
+    {
+      source.bTSOverride = false;
+    }
+
+    // Get logos settings
+    sprintf(nameBuffer, fmt, "logoPathType", i);
+    if (!XBMC->GetSetting(nameBuffer, &iPathType))
+    {
+      iPathType = 1;
+    }
+    if (iPathType)
+    {
+      sprintf(nameBuffer, fmt, "logoBaseUrl", i);
+    }
+    else
+    {
+      sprintf(nameBuffer, fmt, "logoPath", i);
+    }
+    if (XBMC->GetSetting(nameBuffer, &valueBuffer))
+    {
+      source.strLogoPath = valueBuffer;
+    }
+    if ((i == 0) && (source.strLogoPath == ""))
+    {
+      source.strLogoPath = GetClientFilePath("icons/");
+    }
+
+    m_sources.push_back(source);
+  }
+}
+
+bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
+{
+  bool loaded      = false;
+  int iBroadCastId = 0;
+
+  // clear previously loaded epg
+  if (m_epg.size() > 0)
+  {
+    m_epg.clear();
+  }
+
+  for (int i = 0; i < m_sources.size(); i++)
+  {
+    if (LoadEPG(iStart, iEnd, m_sources.at(i), iBroadCastId))
+    {
+      loaded = true;
+    }
+  }
+
+  m_bEGPLoaded = true;
+  return loaded;
+}
+
+bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd, PVRIptvSource &source, int &iBroadCastId)
+{
+  if (source.strTvgPath.IsEmpty())
+  {
     return false;
   }
 
   std::string data;
   std::string decompressed;
   int iReaded = 0;
+  CStdString strCachedName;
+  strCachedName.Fmt(TVG_FILE_NAME_FORMAT, source.iId);
 
   int iCount = 0;
   while(iCount < 3) // max 3 tries
   {
-    if ((iReaded = GetCachedFileContents(TVG_FILE_NAME, m_strXMLTVUrl, data, g_bCacheEPG)) != 0) 
+    if ((iReaded = GetCachedFileContents(strCachedName, source.strTvgPath, data, source.bCacheEPG)) != 0)
     {
       break;
     }
-    XBMC->Log(LOG_ERROR, "Unable to load EPG file '%s':  file is missing or empty. :%dth try.", m_strXMLTVUrl.c_str(), ++iCount);
+    XBMC->Log(LOG_ERROR, "Unable to load EPG file '%s':  file is missing or empty. :%dth try.", source.strTvgPath.c_str(), ++iCount);
     if (iCount < 3)
     {
       usleep(2 * 1000 * 1000); // sleep 2 sec before next try.
@@ -129,8 +313,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
   
   if (iReaded == 0)
   {
-    XBMC->Log(LOG_ERROR, "Unable to load EPG file '%s':  file is missing or empty. After %d tries.", m_strXMLTVUrl.c_str(), iCount);
-    m_bEGPLoaded = true;
+    XBMC->Log(LOG_ERROR, "Unable to load EPG file '%s':  file is missing or empty. After %d tries.", source.strTvgPath.c_str(), iCount);
     m_iLastStart = iStart;
     m_iLastEnd = iEnd;
     return false;
@@ -143,8 +326,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
   {
     if (!GzipInflate(data, decompressed))
     {
-      XBMC->Log(LOG_ERROR, "Invalid EPG file '%s': unable to decompress file.", m_strXMLTVUrl.c_str());
-      m_bEGPLoaded = true;
+      XBMC->Log(LOG_ERROR, "Invalid EPG file '%s': unable to decompress file.", source.strTvgPath.c_str());
       return false;
     }
     buffer = &(decompressed[0]);
@@ -168,8 +350,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
       }
       else
       {
-        XBMC->Log(LOG_ERROR, "Invalid EPG file '%s': unable to parse file.", m_strXMLTVUrl.c_str());
-        m_bEGPLoaded = true;
+        XBMC->Log(LOG_ERROR, "Invalid EPG file '%s': unable to parse file.", source.strTvgPath.c_str());
         return false;
       }
     }
@@ -180,10 +361,9 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
   {
     xmlDoc.parse<0>(buffer);
   } 
-  catch(parse_error p) 
+  catch(parse_error &p)
   {
     XBMC->Log(LOG_ERROR, "Unable parse EPG XML: %s", p.what());
-    m_bEGPLoaded = true;
     return false;
   }
 
@@ -191,17 +371,9 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
   if (!pRootElement)
   {
     XBMC->Log(LOG_ERROR, "Invalid EPG XML: no <tv> tag found");
-    m_bEGPLoaded = true;
     return false;
   }
 
-  // clear previously loaded epg
-  if (m_epg.size() > 0) 
-  {
-    m_epg.clear();
-  }
-
-  int iBroadCastId = 0;
   xml_node<> *pChannelNode = NULL;
   for(pChannelNode = pRootElement->first_node("channel"); pChannelNode; pChannelNode = pChannelNode->next_sibling("channel"))
   {
@@ -219,6 +391,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
     }
 
     PVRIptvEpgChannel epgChannel;
+    epgChannel.iSourceId = source.iId;
     epgChannel.strId = strId;
     epgChannel.strName = strName;
 
@@ -231,9 +404,10 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
     return false;
   }
   
-  int iMinShiftTime = m_iEPGTimeShift;
-  int iMaxShiftTime = m_iEPGTimeShift;
-  if (!m_bTSOverride)
+  int iMinShiftTime = source.iEPGTimeShift;
+  int iMaxShiftTime = source.iEPGTimeShift;
+
+  if (!source.bTSOverride)
   {
     iMinShiftTime = SECONDS_IN_DAY;
     iMaxShiftTime = -SECONDS_IN_DAY;
@@ -241,10 +415,10 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
     vector<PVRIptvChannel>::iterator it;
     for (it = m_channels.begin(); it < m_channels.end(); it++)
     {
-      if (it->iTvgShift + m_iEPGTimeShift < iMinShiftTime)
-        iMinShiftTime = it->iTvgShift + m_iEPGTimeShift;
-      if (it->iTvgShift + m_iEPGTimeShift > iMaxShiftTime)
-        iMaxShiftTime = it->iTvgShift + m_iEPGTimeShift;
+      if (it->iTvgShift + source.iEPGTimeShift < iMinShiftTime)
+        iMinShiftTime = it->iTvgShift + source.iEPGTimeShift;
+      if (it->iTvgShift + source.iEPGTimeShift > iMaxShiftTime)
+        iMaxShiftTime = it->iTvgShift + source.iEPGTimeShift;
     }
   }
 
@@ -258,7 +432,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
 
     if (epg == NULL || epg->strId != strId) 
     {
-      if ((epg = FindEpg(strId)) == NULL) 
+      if ((epg = FindEpg(strId, source.iId)) == NULL)
         continue;
     }
 
@@ -296,6 +470,7 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
       }
     }
 
+
     PVRIptvEpgEntry entry;
     entry.iBroadcastId    = ++iBroadCastId;
     entry.iGenreType      = 0;
@@ -312,25 +487,49 @@ bool PVRIptvData::LoadEPG(time_t iStart, time_t iEnd)
   }
 
   xmlDoc.clear();
-  m_bEGPLoaded = true;
-
-  XBMC->Log(LOG_NOTICE, "EPG Loaded.");
+  XBMC->Log(LOG_NOTICE, "EPG Loaded: %s", source.strTvgPath.c_str());
 
   return true;
 }
 
-bool PVRIptvData::LoadPlayList(void) 
+bool PVRIptvData::LoadPlayList(void)
 {
-  if (m_strM3uUrl.IsEmpty())
+  bool loaded        = false;
+  int iChannelIndex  = 0;
+  int iChannelNum    = m_iStartNumber;
+  int iUniqueGroupId = 0;
+
+  for (int i = 1; i < m_sources.size(); i++)
   {
-    XBMC->Log(LOG_NOTICE, "Playlist file path is not configured. Channels not loaded.");
-    return false;
+    if (LoadPlayList(m_sources.at(i), iChannelIndex, iChannelNum, iUniqueGroupId))
+    {
+      loaded = true;
+    }
   }
 
-  CStdString strPlaylistContent;
-  if (!GetCachedFileContents(M3U_FILE_NAME, m_strM3uUrl, strPlaylistContent, g_bCacheM3U))
+  XBMC->Log(LOG_NOTICE, "Loaded %d channels and %d groups.", m_channels.size(), m_groups.size());
+  ApplyChannelsLogos();
+  return loaded;
+}
+bool PVRIptvData::LoadPlayList(PVRIptvSource &source, int &iChannelIndex, int &iChannelNum, int &iUniqueGroupId)
+{
+  if (source.strM3UPath.IsEmpty())
   {
-    XBMC->Log(LOG_ERROR, "Unable to load playlist file '%s':  file is missing or empty.", m_strM3uUrl.c_str());
+    XBMC->Log(LOG_NOTICE, "Playlist file path for source %i is not configured. Channels not loaded.", source.iId);
+    return false;
+  }
+  else
+  {
+    XBMC->Log(LOG_NOTICE, "Loading playlist: %s", source.strM3UPath.c_str());
+  }
+
+  CStdString strFormat;
+  CStdString strPlaylistContent;
+
+  strFormat.Fmt(M3U_FILE_NAME_FORMAT, source.iId);
+  if (!GetCachedFileContents(strFormat.c_str(), source.strM3UPath, strPlaylistContent, source.bCacheM3U))
+  {
+    XBMC->Log(LOG_ERROR, "Unable to load playlist file '%s':  file is missing or empty.", source.strM3UPath.c_str());
     return false;
   }
 
@@ -338,11 +537,7 @@ bool PVRIptvData::LoadPlayList(void)
 
   /* load channels */
   bool bFirst = true;
-
-  int iChannelIndex     = 0;
-  int iUniqueGroupId    = 0;
   int iCurrentGroupId   = 0;
-  int iChannelNum       = g_iStartNumber;
   int iEPGTimeShift     = 0;
 
   PVRIptvChannel tmpChannel;
@@ -412,9 +607,13 @@ bool PVRIptvData::LoadPlayList(void)
         strTvgId      = ReadMarkerValue(strInfoLine, TVG_INFO_ID_MARKER);
         strTvgName    = ReadMarkerValue(strInfoLine, TVG_INFO_NAME_MARKER);
         strTvgLogo    = ReadMarkerValue(strInfoLine, TVG_INFO_LOGO_MARKER);
-        strGroupName  = ReadMarkerValue(strInfoLine, GROUP_NAME_MARKER);
         strRadio      = ReadMarkerValue(strInfoLine, RADIO_MARKER);
         fTvgShift     = atof(ReadMarkerValue(strInfoLine, TVG_INFO_SHIFT_MARKER));
+        strGroupName  = ReadMarkerValue(strInfoLine, GROUP_NAME_MARKER);
+        strFormat.Fmt(source.strGroupNameFormat, XBMC->UnknownToUTF8(strGroupName));
+        strGroupName = strFormat;
+        strFormat.Fmt(m_sources.at(0).strGroupNameFormat, strGroupName.c_str());
+        strGroupName = strFormat;
 
         if (strTvgId.IsEmpty())
         {
@@ -441,8 +640,6 @@ bool PVRIptvData::LoadPlayList(void)
 
         if (!strGroupName.IsEmpty())
         {
-          strGroupName = XBMC->UnknownToUTF8(strGroupName);
-
           PVRIptvChannelGroup * pGroup;
           if ((pGroup = FindGroup(strGroupName)) == NULL)
           {
@@ -465,6 +662,7 @@ bool PVRIptvData::LoadPlayList(void)
     {
       PVRIptvChannel channel;
       channel.iUniqueId         = GetChannelId(tmpChannel.strChannelName.c_str(), strLine);
+      channel.iSourceId         = source.iId;
       channel.iChannelNumber    = iChannelNum++;
       channel.strTvgId          = tmpChannel.strTvgId;
       channel.strChannelName    = tmpChannel.strChannelName;
@@ -474,6 +672,11 @@ bool PVRIptvData::LoadPlayList(void)
       channel.bRadio            = tmpChannel.bRadio;
       channel.strStreamURL      = strLine;
       channel.iEncryptionSystem = 0;
+
+      strFormat.Fmt(source.strChannelNameFormat, tmpChannel.strChannelName.c_str());
+      tmpChannel.strChannelName = strFormat;
+      strFormat.Fmt(m_sources.at(0).strChannelNameFormat, tmpChannel.strChannelName.c_str());
+      channel.strChannelDisplayName = strFormat;
 
       if (iCurrentGroupId > 0) 
       {
@@ -497,13 +700,10 @@ bool PVRIptvData::LoadPlayList(void)
 
   if (m_channels.size() == 0)
   {
-    XBMC->Log(LOG_ERROR, "Unable to load channels from file '%s':  file is corrupted.", m_strM3uUrl.c_str());
+    XBMC->Log(LOG_ERROR, "Unable to load channels from file '%s':  file is corrupted.", source.strM3UPath.c_str());
     return false;
   }
 
-  ApplyChannelsLogos();
-
-  XBMC->Log(LOG_NOTICE, "Loaded %d channels.", m_channels.size());
   return true;
 }
 
@@ -525,7 +725,7 @@ PVR_ERROR PVRIptvData::GetChannels(ADDON_HANDLE handle, bool bRadio)
       xbmcChannel.iUniqueId         = channel.iUniqueId;
       xbmcChannel.bIsRadio          = channel.bRadio;
       xbmcChannel.iChannelNumber    = channel.iChannelNumber;
-      strncpy(xbmcChannel.strChannelName, channel.strChannelName.c_str(), sizeof(xbmcChannel.strChannelName) - 1);
+      strncpy(xbmcChannel.strChannelName, channel.strChannelDisplayName.c_str(), sizeof(xbmcChannel.strChannelName) - 1);
       strncpy(xbmcChannel.strStreamURL, channel.strStreamURL.c_str(), sizeof(xbmcChannel.strStreamURL) - 1);
       xbmcChannel.iEncryptionSystem = channel.iEncryptionSystem;
       strncpy(xbmcChannel.strIconPath, channel.strLogoPath.c_str(), sizeof(xbmcChannel.strIconPath) - 1);
@@ -545,13 +745,14 @@ bool PVRIptvData::GetChannel(const PVR_CHANNEL &channel, PVRIptvChannel &myChann
     PVRIptvChannel &thisChannel = m_channels.at(iChannelPtr);
     if (thisChannel.iUniqueId == (int) channel.iUniqueId)
     {
-      myChannel.iUniqueId         = thisChannel.iUniqueId;
-      myChannel.bRadio            = thisChannel.bRadio;
-      myChannel.iChannelNumber    = thisChannel.iChannelNumber;
-      myChannel.iEncryptionSystem = thisChannel.iEncryptionSystem;
-      myChannel.strChannelName    = thisChannel.strChannelName;
-      myChannel.strLogoPath       = thisChannel.strLogoPath;
-      myChannel.strStreamURL      = thisChannel.strStreamURL;
+      myChannel.iUniqueId             = thisChannel.iUniqueId;
+      myChannel.bRadio                = thisChannel.bRadio;
+      myChannel.iChannelNumber        = thisChannel.iChannelNumber;
+      myChannel.iEncryptionSystem     = thisChannel.iEncryptionSystem;
+      myChannel.strChannelName        = thisChannel.strChannelName;
+      myChannel.strChannelDisplayName = thisChannel.strChannelDisplayName;
+      myChannel.strLogoPath           = thisChannel.strLogoPath;
+      myChannel.strStreamURL          = thisChannel.strStreamURL;
 
       return true;
     }
@@ -636,7 +837,8 @@ PVR_ERROR PVRIptvData::GetEPGForChannel(ADDON_HANDLE handle, const PVR_CHANNEL &
       return PVR_ERROR_NO_ERROR;
     }
 
-    int iShift = m_bTSOverride ? m_iEPGTimeShift : myChannel->iTvgShift + m_iEPGTimeShift;
+    PVRIptvSource &source = m_sources.at(myChannel->iSourceId);
+    int iShift = source.bTSOverride ? source.iEPGTimeShift : myChannel->iTvgShift + source.iEPGTimeShift;
 
     vector<PVRIptvEpgEntry>::iterator myTag;
     for (myTag = epg->epg.begin(); myTag < epg->epg.end(); myTag++)
@@ -750,12 +952,12 @@ PVRIptvChannelGroup * PVRIptvData::FindGroup(const std::string &strName)
   return NULL;
 }
 
-PVRIptvEpgChannel * PVRIptvData::FindEpg(const std::string &strId)
+PVRIptvEpgChannel * PVRIptvData::FindEpg(const std::string &strId, int iSourceId)
 {
   vector<PVRIptvEpgChannel>::iterator it;
   for(it = m_epg.begin(); it < m_epg.end(); it++)
   {
-    if (it->strId == strId)
+    if ((it->iSourceId == iSourceId) && (it->strId == strId))
     {
       return &*it;
     }
@@ -766,27 +968,50 @@ PVRIptvEpgChannel * PVRIptvData::FindEpg(const std::string &strId)
 
 PVRIptvEpgChannel * PVRIptvData::FindEpgForChannel(PVRIptvChannel &channel)
 {
+  PVRIptvEpgChannel * epg = NULL;
+
   vector<PVRIptvEpgChannel>::iterator it;
   for(it = m_epg.begin(); it < m_epg.end(); it++)
   {
     if (it->strId == channel.strTvgId)
     {
-      return &*it;
+      if (it->iSourceId == channel.iSourceId)
+      {
+        return &*it;
+      }
+      else if (it->iSourceId == 0)
+      {
+        epg = &*it;
+      }
     }
     CStdString strName = it->strName;
     strName.Replace(' ', '_');
     if (strName == channel.strTvgName
       || it->strName == channel.strTvgName)
     {
-      return &*it;
+      if (it->iSourceId == channel.iSourceId)
+      {
+        return &*it;
+      }
+      else if (it->iSourceId == 0)
+      {
+        epg = &*it;
+      }
     }
     if (it->strName == channel.strChannelName)
     {
-      return &*it;
+      if (it->iSourceId == channel.iSourceId)
+      {
+        return &*it;
+      }
+      else if (it->iSourceId == 0)
+      {
+        epg = &*it;
+      }
     }
   }
 
-  return NULL;
+  return epg;
 }
 
 /*
@@ -909,59 +1134,23 @@ int PVRIptvData::GetCachedFileContents(const std::string &strCachedName, const s
 
 void PVRIptvData::ApplyChannelsLogos()
 {
-  if (m_strLogoPath.IsEmpty())
-    return;
-
+  CStdString fileName;
   vector<PVRIptvChannel>::iterator channel;
+  PVRIptvSource defaultSource = m_sources.at(0);
+
   for(channel = m_channels.begin(); channel < m_channels.end(); channel++)
   {
-    channel->strLogoPath = PathCombine(m_strLogoPath, channel->strTvgLogo);
-    //channel->strLogoPath.append(CHANNEL_LOGO_EXTENSION);
-  }
-}
+    PVRIptvSource &source = m_sources.at(channel->iSourceId);
 
-void PVRIptvData::ReaplyChannelsLogos(const char * strNewPath)
-{
-  if (strlen(strNewPath) > 0)
-  {
-    m_strLogoPath = strNewPath;
-    ApplyChannelsLogos();
-
-    PVR->TriggerChannelUpdate();
-    PVR->TriggerChannelGroupsUpdate();
-  }
-}
-
-void PVRIptvData::ReloadEPG(const char * strNewPath)
-{
-  if (strNewPath != m_strXMLTVUrl)
-  {
-    m_strXMLTVUrl = strNewPath;
-    m_bEGPLoaded = false;
-    // TODO clear epg for all channels
-
-    if (LoadEPG(m_iLastStart, m_iLastEnd))
+    if (!source.strLogoPath.IsEmpty())
     {
-      for(unsigned int iChannelPtr = 0, max = m_channels.size(); iChannelPtr < max; iChannelPtr++)
-      {
-        PVRIptvChannel &myChannel = m_channels.at(iChannelPtr);
-        PVR->TriggerEpgUpdate(myChannel.iUniqueId);
-      }
+      fileName.Fmt(source.strLogoFileNameFormat, channel->strTvgLogo.c_str());
+      channel->strLogoPath = PathCombine(source.strLogoPath, fileName.c_str());
     }
-  }
-}
-
-void PVRIptvData::ReloadPlayList(const char * strNewPath)
-{
-  if (strNewPath != m_strM3uUrl)
-  {
-    m_strM3uUrl = strNewPath;
-    m_channels.clear();
-
-    if (LoadPlayList())
+    else
     {
-      PVR->TriggerChannelUpdate();
-      PVR->TriggerChannelGroupsUpdate();
+      fileName.Fmt(defaultSource.strLogoFileNameFormat, channel->strTvgLogo.c_str());
+      channel->strLogoPath = PathCombine(defaultSource.strLogoPath, fileName.c_str());
     }
   }
 }
