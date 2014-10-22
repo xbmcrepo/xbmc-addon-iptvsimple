@@ -8,13 +8,14 @@ DIST_SUBDIRS = \
 	$(SUBDIRS)
 
 install: all
-	mkdir -m 755 -p $(DESTDIR)@LIBDIR@/pvr.iptvsimple
-	mkdir -m 755 -p $(DESTDIR)@DATADIR@/pvr.iptvsimple
-	cp -r addons/pvr.iptvsimple .
-	$(STRIP) -x pvr.iptvsimple/$(ADDONNAME)
-	cp -f pvr.iptvsimple/$(ADDONNAME) $(DESTDIR)@LIBDIR@/pvr.iptvsimple ; chmod 655 $(DESTDIR)@LIBDIR@/pvr.iptvsimple/$(ADDONNAME)
-	cp -r -f @abs_top_srcdir@/addons/pvr.iptvsimple/* $(DESTDIR)@DATADIR@/pvr.iptvsimple ; chmod -R o+rx $(DESTDIR)@DATADIR@/pvr.iptvsimple
-	rm -Rf pvr.iptvsimple
+	install -m 755 -d "$(DESTDIR)@LIBDIR@/pvr.iptvsimple" 
+	install -m 755 -d "$(DESTDIR)@DATADIR@/pvr.iptvsimple" 
+	install -m 644 -s addons/pvr.iptvsimple/$(ADDONNAME) "$(DESTDIR)@LIBDIR@/pvr.iptvsimple" 
+	install -m 644    addons/pvr.iptvsimple/addon.xml    "$(DESTDIR)@DATADIR@/pvr.iptvsimple"
+	install -m 644    addons/pvr.iptvsimple/icon.png     "$(DESTDIR)@DATADIR@/pvr.iptvsimple"
+	install -m 644    changelog.txt                      "$(DESTDIR)@DATADIR@/pvr.iptvsimple"
+	for i in `cd addons/pvr.iptvsimple; find resources -type d`; do install -m 755 -d   "$(DESTDIR)@DATADIR@/pvr.iptvsimple/$$i"; done
+	for i in `cd addons/pvr.iptvsimple; find resources -type f`; do install -m 644 "addons/pvr.iptvsimple/$$i" "$(DESTDIR)@DATADIR@/pvr.iptvsimple/$$i"; done
 
 uninstall:
 	rm -Rf $(DESTDIR)@LIBDIR@/pvr.iptvsimple
