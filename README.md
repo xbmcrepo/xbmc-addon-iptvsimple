@@ -5,6 +5,7 @@ This is a PVR add-on for XBMC. It add support for Live TV watching and
 EPG TV Guide through IPTV provided by the Internet providers in exUSSR countries.
 
 ------------------------------------------
+forked from AndreyPavlenko/xbmc-addon-iptvsimple
 
 Written by: Anton Fedchin
 
